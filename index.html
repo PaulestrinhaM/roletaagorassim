@@ -361,7 +361,7 @@
         </div>
       </div>
     </div>
-    <a href="controle.html" style="text-decoration: none;""><button id="voltar">Voltar ao menu controle</button></a>
+    <a href="controle.html" style="text-decoration: none;""><button id="voltar"> Voltar ao menu controle</button></a>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script>
       /* ==============================
@@ -372,6 +372,8 @@
       const HISTORY_KEY = "wheelHistory"; // últimas rodadas
       const FORCE_KEY = "forceWinAfterLosses"; // regra de derrotas
 
+      const showBtn = localStorage.getItem('showControleBtn') === 'true';
+document.getElementById('voltar').closest('a').style.display = showBtn ? 'inline-block' : 'none';
       function getConfig() {
         try {
           const data = JSON.parse(localStorage.getItem(CONFIG_KEY));
