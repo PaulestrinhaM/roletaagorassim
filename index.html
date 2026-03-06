@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Roleta da Gesto</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        background: transparent;
+        color: #fff;
+        font:
+          40px "Exo 2",
+          sans-serif;
+      }
+      :root {
+        --wheel-size: 650px; /* aumente p/ 800~900 se quiser */
+        --spin-time: 11.5s;
+        --ease: cubic-bezier(0, 0.99, 0.44, 0.99);
+      }
+      .stage {
+        width: 100vw;
+        height: 100vh;
+        max-width: 1080px;
+        max-height: 1920px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        place-items: center;
+        padding: 24px;
+      }
+      h1 {
+        color: #eef0f2;
+        font-size: clamp(32px, 5vw, 80px);
+        margin: 8px 0;
+        text-align: center;
+        line-height: 1.1;
+      }
+      #container {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+      }
+
+      /* Área da roleta */
+      .wheel-wrap {
+        position: relative;
+        width: var(--wheel-size);
+        height: var(--wheel-size);
+        /* evita scroll/zoom interferirem no gesto */
+        touch-action: none;
+      }
+      svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Borda externa */
+      .rim {
+        fill: none;
+        stroke: rgb(45, 20, 186);
+        stroke-width: 10;
+      }
+      .inner-rim {
+        fill: none;
+        stroke: rgba(0, 0, 0, 0.1);
+        stroke-width: 4;
+      }
+
+      /* Qualidade de renderização */
+      svg,
+      path {
+        shape-rendering: geometricPrecision;
+        vector-effect: non-scaling-stroke;
+      }
+
+      /* Grupo que gira */
+      #wheelGroup {
+        transition: transform var(--spin-time) var(--ease);
+        transform-origin: 50% 50%;
+      }
+
+      /* Caixa de texto de cada pá */
+      .seg-label {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 10px;
+        text-align: center;
+        color: #fff;
+        font-weight: 700;
+        line-height: 1.2;
+        text-shadow: rgba(0, 0, 0, 0.35) 0 1px 0;
+        overflow: hidden;
+      }
+
+      /* Botão central + ponteiro */
+      #spin {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 86px;
+        height: 86px;
+        border-radius: 50%;
+        border: 0;
+        cursor: pointer;
+        background: #fff;
+        z-index: 5;
+        box-shadow: rgba(0, 0, 0, 0.1) 0 4px 0;
+      }
+      #spin::after {
+        content: "GIRAR";
+        display: block;
+        width: 100%;
+        height: 100%;
+        line-height: 86px;
+        text-align: center;
+        color: #252020;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+      #spin::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        top: -14px;
+        width: 0;
+        height: 0;
+        border-style: solid;
+        border-width: 0 22px 32px 22px;
+        border-color: transparent transparent #ffffff transparent;
+        filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.15));
+        z-index: 6;
+      }
+
+      #message {
+        margin-top: 18px;
+        font-size: clamp(16px, 2vw, 22px);
+        font-weight: 700;
+        text-align: center;
+        min-height: 28px;
+        opacity: 0.9;
+      }
+      .foot {
+        opacity: 1;
+        font-size: 14px;
+        text-align: center;
+        margin-bottom: 8px;
+      }
+
+      /* Modal */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 24px;
+      }
+      .modal-backdrop.show {
+        display: flex;
+      }
+      .modal {
+        width: min(92vw, 560px);
+        background: #121214;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+        overflow: hidden;
+        animation: pop 0.28s ease-out;
+      }
+      @keyframes pop {
+        from {
+          transform: translateY(6px) scale(0.98);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0) scale(1);
+          opacity: 1;
+        }
+      }
+      .modal__header {
+        padding: 20px 22px;
+        background: linear-gradient(135deg, #2d14ba 0%, #5330e6 100%);
+        color: #fff;
+        font-weight: 700;
+      }
+      .modal__body {
+        padding: 22px;
+        color: #e9e9f0;
+        line-height: 1.45;
+        font-size: 18px;
+      }
+      .modal__prize {
+        margin-top: 6px;
+        font-size: 20px;
+        font-weight: 700;
+        color: #fff;
+      }
+      .modal__actions {
+        display: flex;
+        gap: 12px;
+        padding: 20px 22px 24px;
+      }
+      .btn {
+        flex: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 14px 16px;
+        border-radius: 12px;
+        border: 0;
+        cursor: pointer;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        transition:
+          transform 0.04s ease,
+          opacity 0.2s ease;
+      }
+      .btn:active {
+        transform: translateY(1px);
+      }
+      .btn--primary {
+        background: #88f23d;
+        color: #0b0b0c;
+      }
+      .btn--secondary {
+        background: #2a2a2e;
+        color: #e9e9f0;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .btn--lose {
+        background: #ff4d4f;
+        color: #fff;
+      }
+
+      @media (max-width: 740px) {
+        :root {
+          --wheel-size: 84vw;
+        }
+      }
+      #bgVideo {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: -1;
+      }
+      #voltar {
+        position: absolute;
+        right: 20px;
+        width: 90px;
+        background-color: dodgerblue;
+        font-weight: bold;
+        color: #ffffff;
+        border-radius: 10px;
+        padding: 5px;
+        border-width: 0px;
+      }
+      #voltar:hover {
+        position: absolute;
+        right: 20px;
+        width: 90px;
+        background-color: rgb(0, 255, 0);
+        font-weight: bold;
+        color: #000000;
+        border-radius: 10px;
+        padding: 5px;
+        border-width: 0px;
+        transform: scale(1.1);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Áudios -->
+    <audio
+      id="sndSpin"
+      src="sons/spin.ogg"
+      preload="auto"
+      playsinline
+      loop
+    ></audio>
+    <audio id="sndWin" src="sons/win.ogg" preload="auto"></audio>
+    <audio id="sndLose" src="sons/lose.ogg" preload="auto"></audio>
+
+    <video autoplay muted loop id="bgVideo">
+      <source src="COMP_FINAL.webm" type="video/webm" />
+    </video>
+
+    <div class="stage">
+      <h1></h1>
+
+      <div id="container">
+        <div class="wheel-wrap">
+          <!-- SVG da roleta -->
+          <svg id="wheelSvg" viewBox="0 0 1000 1000" aria-label="Roleta SVG">
+            <!-- borda -->
+            <circle cx="500" cy="500" r="490" class="rim" />
+            <circle cx="500" cy="500" r="470" class="inner-rim" />
+
+            <!-- grupo que gira -->
+            <g id="wheelGroup"></g>
+          </svg>
+
+          <!-- botão/ponteiro -->
+          <button
+            id="spin"
+            aria-label="Girar roleta"
+            title="Girar roleta"
+          ></button>
+        </div>
+
+        <div id="message" aria-live="polite"></div>
+      </div>
+
+      <div class="foot">
+        <img src="logo-gesto-cipnet (1).png" alt="" width="100px" />
+      </div>
+    </div>
+
+    <!-- Modal -->
+    <div
+      class="modal-backdrop"
+      id="modalBackdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modalTitle"
+    >
+      <div class="modal">
+        <div class="modal__header" id="modalTitle">Resultado</div>
+        <div class="modal__body" id="modalBody"></div>
+        <div class="modal__actions">
+          <button class="btn btn--primary" id="btnWin" style="display: none">
+            Eba! Vou pegar meu prêmio!
+          </button>
+          <button class="btn btn--lose" id="btnLose" style="display: none">
+            Que pena, fica pra próxima
+          </button>
+        </div>
+      </div>
+    </div>
+    <a href="controle.html" style="text-decoration: none;""><button id="voltar">Voltar ao menu controle</button></a>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+      /* ==============================
+         CONFIGURAÇÃO E ESTADO
+      ================================*/
+      const CONFIG_KEY = "wheelConfig"; // setores configurados no painel
+      const LIMITS_KEY = "wheelPrizeCounts"; // contadores de prêmios
+      const HISTORY_KEY = "wheelHistory"; // últimas rodadas
+      const FORCE_KEY = "forceWinAfterLosses"; // regra de derrotas
+
+      function getConfig() {
+        try {
+          const data = JSON.parse(localStorage.getItem(CONFIG_KEY));
+          return Array.isArray(data) ? data : [];
+        } catch {
+          return [];
+        }
+      }
+      function getCounts() {
+        try {
+          return JSON.parse(localStorage.getItem(LIMITS_KEY)) || {};
+        } catch {
+          return {};
+        }
+      }
+      function saveCounts(counts) {
+        localStorage.setItem(LIMITS_KEY, JSON.stringify(counts));
+      }
+      function getForceWinCfg() {
+        try {
+          return (
+            JSON.parse(localStorage.getItem(FORCE_KEY)) || {
+              enabled: false,
+              losses: 5,
+            }
+          );
+        } catch {
+          return { enabled: false, losses: 5 };
+        }
+      }
+
+      /* ==============================
+         LIMITES E HISTÓRICO
+      ================================*/
+      function canWinPrize(prizeName) {
+        const cfg = getConfig();
+        const sector = cfg.find((s) => s.text === prizeName);
+        if (!sector || sector.status !== "ganho") return false;
+
+        const counts = getCounts();
+        const entregues = counts[prizeName] || 0;
+        return !sector.limit || entregues < sector.limit;
+      }
+      function registerPrize(prizeName) {
+        const counts = getCounts();
+        counts[prizeName] = (counts[prizeName] || 0) + 1;
+        saveCounts(counts);
+      }
+      function allPrizesExhausted() {
+        const cfg = getConfig();
+        const counts = getCounts();
+        return cfg
+          .filter((s) => s.status === "ganho")
+          .every((s) => {
+            if (!s.limit) return false;
+            return (counts[s.text] || 0) >= s.limit;
+          });
+      }
+
+      function getHistory() {
+        try {
+          const raw = localStorage.getItem(HISTORY_KEY);
+          return raw ? JSON.parse(raw).slice(-5) : [];
+        } catch {
+          return [];
+        }
+      }
+      function saveResult(status) {
+        const h = getHistory();
+        h.push(status);
+        const last5 = h.slice(-5);
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(last5));
+        return last5;
+      }
+      /* ==============================
+         HISTÓRICO COMPLETO
+      ================================*/
+      function saveFullHistory(item, status, forcedByHistory = false) {
+        const full = JSON.parse(
+          localStorage.getItem("wheelFullHistory") || "[]",
+        );
+        full.push({
+          item,
+          status,
+          forcedByHistory,
+          timestamp: new Date().toISOString(),
+        });
+        localStorage.setItem("wheelFullHistory", JSON.stringify(full));
+      }
+
+      function shouldForceWin() {
+        const cfg = getForceWinCfg();
+        if (!cfg.enabled) return false;
+        const needed = cfg.losses || 5;
+        const h = getHistory();
+        if (h.length < needed) return false;
+        return h.slice(-needed).every((s) => s === "perda");
+      }
+
+      /* ==============================
+         ÁUDIOS
+      ================================*/
+      const sndSpin = document.getElementById("sndSpin");
+      const sndWin = document.getElementById("sndWin");
+      const sndLose = document.getElementById("sndLose");
+
+      function playAudio(el, { loop = false, volume = 1 } = {}) {
+        try {
+          el.pause();
+          el.currentTime = 0;
+          el.loop = loop;
+          el.volume = volume;
+          el.play();
+        } catch {}
+      }
+      function stopAudio(el) {
+        try {
+          el.pause();
+          el.currentTime = 0;
+        } catch {}
+      }
+      function stopAllAudio() {
+        [sndSpin, sndWin, sndLose].forEach(stopAudio);
+      }
+
+      window.addEventListener(
+        "pointerdown",
+        () => {
+          try {
+            sndSpin.play().then(() => {
+              sndSpin.pause();
+              sndSpin.currentTime = 0;
+            });
+          } catch {}
+        },
+        { once: true },
+      );
+
+      /* ==============================
+         DESENHO DA RODA
+      ================================*/
+      const svg = document.getElementById("wheelSvg");
+      const group = document.getElementById("wheelGroup");
+      const spinButton = document.getElementById("spin");
+
+      const modalBackdrop = document.getElementById("modalBackdrop");
+      const modalBody = document.getElementById("modalBody");
+      const btnWin = document.getElementById("btnWin");
+      const btnLose = document.getElementById("btnLose");
+      const messageEl = document.getElementById("message");
+
+      let sectors = getConfig();
+      if (!sectors.length) {
+        alert("Configure os setores no Controle antes de usar a roleta.");
+        window.location.href = "controle.html";
+      }
+
+      const cx = 500,
+        cy = 500,
+        R = 470,
+        Ri = 86,
+        n = sectors.length;
+      const sweep = 360 / n,
+        textRadius = (Ri + R) * 0.62;
+      const theta = (sweep * Math.PI) / 180;
+      const chord = 2 * textRadius * Math.sin(theta / 2);
+      const boxW = Math.max(120, chord * 0.85),
+        boxH = Math.max(48, (R - Ri) * 0.28);
+
+      function toRad(d) {
+        return (d * Math.PI) / 180;
+      }
+      function describeWedge(cx, cy, rOuter, rInner, a0Deg, a1Deg) {
+        const a0 = toRad(a0Deg - 90),
+          a1 = toRad(a1Deg - 90);
+        const largeArc = (a1Deg - a0Deg) % 360 > 180 ? 1 : 0;
+        const x0 = cx + rOuter * Math.cos(a0),
+          y0 = cy + rOuter * Math.sin(a0);
+        const x1 = cx + rOuter * Math.cos(a1),
+          y1 = cy + rOuter * Math.sin(a1);
+        const x2 = cx + rInner * Math.cos(a1),
+          y2 = cy + rInner * Math.sin(a1);
+        const x3 = cx + rInner * Math.cos(a0),
+          y3 = cy + rInner * Math.sin(a0);
+        return `M ${x0} ${y0} A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${x1} ${y1}
+                L ${x2} ${y2} A ${rInner} ${rInner} 0 ${largeArc} 0 ${x3} ${y3} Z`;
+      }
+
+      function buildWheel() {
+        group.innerHTML = "";
+        const defs = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "defs",
+        );
+        for (let i = 0; i < n; i++) {
+          const start = i * sweep,
+            end = (i + 1) * sweep,
+            mid = start + sweep / 2;
+          const path = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "path",
+          );
+          path.setAttribute("d", describeWedge(cx, cy, R, Ri, start, end));
+          path.setAttribute("fill", sectors[i].color || "#888");
+          path.setAttribute("stroke", "rgba(0,0,0,.15)");
+          path.setAttribute("stroke-width", "1");
+          const cp = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "clipPath",
+          );
+          cp.setAttribute("id", `clip-${i}`);
+          const cpPath = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "path",
+          );
+          cpPath.setAttribute("d", describeWedge(cx, cy, R, Ri, start, end));
+          cp.appendChild(cpPath);
+          defs.appendChild(cp);
+          const midRad = toRad(mid - 90),
+            bx = cx + textRadius * Math.cos(midRad),
+            by = cy + textRadius * Math.sin(midRad);
+          const fo = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "foreignObject",
+          );
+          fo.setAttribute("x", bx - boxW / 2);
+          fo.setAttribute("y", by - boxH / 2);
+          fo.setAttribute("width", boxW);
+          fo.setAttribute("height", boxH);
+          fo.setAttribute("clip-path", `url(#clip-${i})`);
+          const div = document.createElement("div");
+          div.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+          div.className = "seg-label";
+          div.textContent = sectors[i].text;
+          fo.appendChild(div);
+          group.appendChild(path);
+          group.appendChild(fo);
+        }
+        svg.insertBefore(defs, group);
+      }
+      buildWheel();
+
+      /* ==============================
+         GIRO
+      ================================*/
+      let isSpinning = false,
+        lastRotation = 0;
+
+      function pickIndexByProb() {
+        const total = sectors.reduce((a, s) => a + (+s.prob || 0), 0);
+        if (total <= 0) return Math.floor(Math.random() * sectors.length);
+        let r = Math.random() * total,
+          acc = 0;
+        for (let i = 0; i < sectors.length; i++) {
+          acc += +sectors[i].prob || 0;
+          if (r <= acc) return i;
+        }
+        return sectors.length - 1;
+      }
+      function pickWinningIndex() {
+        const winning = sectors
+          .map((s, i) => ({ i, prob: +s.prob || 0 }))
+          .filter((x) => sectors[x.i].status === "ganho");
+        if (!winning.length) return pickIndexByProb();
+        const total = winning.reduce((a, x) => a + x.prob, 0) || winning.length;
+        let r = Math.random() * total,
+          acc = 0;
+        for (const x of winning) {
+          acc += x.prob || 1;
+          if (r <= acc) return x.i;
+        }
+        return winning[winning.length - 1].i;
+      }
+      function getValidIndices(forceWin = false) {
+        if (forceWin) {
+          // somente ganhos disponíveis
+          return sectors
+            .map((s, i) => ({ i, prob: +s.prob || 0 }))
+            .filter(
+              (x) =>
+                sectors[x.i].status === "ganho" &&
+                canWinPrize(sectors[x.i].text),
+            );
+        }
+
+        // todos os setores, mas se for prêmio, precisa ter limite disponível
+        return sectors
+          .map((s, i) => ({ i, prob: +s.prob || 0 }))
+          .filter((x) => {
+            const s = sectors[x.i];
+            if (s.status === "ganho") return canWinPrize(s.text);
+            return true; // perdas sempre entram
+          });
+      }
+
+      function computeSpin() {
+        const cfg = getForceWinCfg();
+        let idx;
+
+        // regra de forçar vitória
+        const h = getHistory();
+        const needed = cfg.losses || 5;
+        const forceWin =
+          cfg.enabled &&
+          h.length >= needed &&
+          h.slice(-needed).every((s) => s === "perda");
+
+        const pool = getValidIndices(forceWin);
+
+        if (!pool.length) {
+          // fallback: tudo esgotado → derrota
+          idx = sectors.findIndex((s) => s.status === "perda");
+        } else {
+          const total = pool.reduce((a, x) => a + x.prob, 0) || pool.length;
+          let r = Math.random() * total,
+            acc = 0;
+          for (const x of pool) {
+            acc += x.prob || 1;
+            if (r <= acc) {
+              idx = x.i;
+              break;
+            }
+          }
+        }
+
+        const centerAngle = idx * sweep + sweep / 2;
+        const alignment = (360 - (centerAngle % 360)) % 360;
+        const fullTurns = Math.floor(Math.random() * 3) + 10;
+        const paradaAleatoria = Math.floor(Math.random() * 35) - 18;
+        const totalRotation =
+          lastRotation + fullTurns * 360 + alignment + paradaAleatoria;
+
+        return { totalRotation, idx };
+      }
+
+      /* ==============================
+         MODAL
+      ================================*/
+      function openModal({ status, itemName }) {
+        const ganhou = status === "ganho";
+        const titulo = ganhou ? "🎉 Você ganhou!" : "😕 Não foi dessa vez";
+        const texto = ganhou
+          ? `Parabéns! Você ganhou <span class="modal__prize">${itemName}</span>.`
+          : `Que pena! O resultado foi <span class="modal__prize">${itemName}</span>.`;
+        document.getElementById("modalTitle").textContent = titulo;
+        modalBody.innerHTML = `<p>${texto}</p><p style="opacity:.8;margin-top:10px;">Toque no botão para continuar.</p>`;
+        btnWin.style.display = ganhou ? "inline-flex" : "none";
+        btnLose.style.display = ganhou ? "none" : "inline-flex";
+        modalBackdrop.classList.add("show");
+        setTimeout(() => (ganhou ? btnWin : btnLose).focus(), 50);
+      }
+      function closeModalAndReset() {
+        modalBackdrop.classList.remove("show");
+        if (allPrizesExhausted()) {
+          window.location.href = "premios-esgotados.html";
+          return;
+        }
+        group.style.transition = "none";
+        group.style.transform = "rotate(0deg)";
+        lastRotation = 0;
+        messageEl.textContent = "";
+        setTimeout(() => {
+          group.style.transition = `transform var(--spin-time) var(--ease)`;
+          isSpinning = false;
+          spinButton.disabled = false;
+        }, 50);
+      }
+
+      /* ==============================
+         EVENTOS
+      ================================*/
+
+      spinButton.addEventListener("click", startSpin);
+
+      /* A lógica completa do giro foi centralizada aqui para ser reutilizada pelo clique e pelo gesto */
+      function startSpin() {
+        if (isSpinning) return;
+        isSpinning = true;
+        spinButton.disabled = true;
+        stopAllAudio();
+        playAudio(sndSpin, { volume: 0.6 });
+        const { totalRotation, idx } = computeSpin();
+        group.style.transform = `rotate(${totalRotation}deg)`;
+        setTimeout(
+          () => {
+            stopAudio(sndSpin);
+            const s = sectors[idx];
+            if (s.status === "ganho" && canWinPrize(s.text)) {
+              registerPrize(s.text);
+              playAudio(sndWin, { volume: 0.9 });
+              confetti({ particleCount: 120, spread: 75, origin: { y: 0.6 } });
+            } else {
+              playAudio(sndLose, { volume: 0.9 });
+            }
+            openModal({ status: s.status, itemName: s.text });
+            saveResult(s.status);
+            // salva histórico completo
+            const cfg = getForceWinCfg();
+            const needed = cfg.losses || 5;
+            const h = getHistory();
+            const forceWin =
+              cfg.enabled &&
+              h.length >= needed &&
+              h.slice(-needed).every((x) => x === "perda");
+            saveFullHistory(s.text, s.status, forceWin && s.status === "ganho");
+
+            lastRotation = totalRotation;
+          },
+          (parseFloat(getComputedStyle(group).transitionDuration) || 0) *
+            1000 || 6000,
+        );
+      }
+
+      /* ==============================
+         SUPORTE A GESTO DE ARRASTAR
+         - Arrasto horizontal/vertical > 80px dispara o giro
+         - Mantém toda a lógica existente
+      ================================*/
+      let dragActive = false;
+      let dragStartX = 0,
+        dragStartY = 0;
+      let dragDeltaX = 0,
+        dragDeltaY = 0;
+
+      const wheelArea = document.getElementById("wheelSvg");
+
+      wheelArea.addEventListener("pointerdown", (e) => {
+        if (isSpinning) return;
+        dragActive = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        dragDeltaX = 0;
+        dragDeltaY = 0;
+        try {
+          wheelArea.setPointerCapture(e.pointerId);
+        } catch {}
+      });
+
+      wheelArea.addEventListener("pointermove", (e) => {
+        if (!dragActive) return;
+        dragDeltaX = e.clientX - dragStartX;
+        dragDeltaY = e.clientY - dragStartY;
+      });
+
+      function endDrag(e) {
+        if (!dragActive) return;
+        dragActive = false;
+        try {
+          wheelArea.releasePointerCapture(e.pointerId);
+        } catch {}
+        const distance = Math.hypot(dragDeltaX, dragDeltaY);
+        if (distance > 300 && !isSpinning) {
+          startSpin();
+        }
+        dragDeltaX = 0;
+        dragDeltaY = 0;
+      }
+      wheelArea.addEventListener("pointerup", endDrag);
+      wheelArea.addEventListener("pointercancel", endDrag);
+      wheelArea.addEventListener("pointerleave", endDrag);
+
+      /* ==============================
+         FECHAR MODAL
+      ================================*/
+      [btnWin, btnLose, modalBackdrop].forEach((el) => {
+        el.addEventListener("click", (e) => {
+          if (
+            e.target === modalBackdrop ||
+            e.target === btnWin ||
+            e.target === btnLose
+          ) {
+            closeModalAndReset();
+          }
+        });
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modalBackdrop.classList.contains("show"))
+          closeModalAndReset();
+      });
+    </script>
+  </body>
+</html>

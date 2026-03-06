@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Painel de Controle</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f9f9f9;
+        color: #333;
+        padding: 20px;
+      }
+      h1,
+      h2 {
+        margin: 20px 0 10px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-bottom: 20px;
+        background: #fff;
+      }
+      th,
+      td {
+        border: 1px solid #ccc;
+        padding: 10px;
+        text-align: center;
+      }
+      input,
+      select {
+        padding: 4px;
+      }
+      input[type="number"] {
+        width: 70px;
+        text-align: center;
+      }
+      input[type="color"] {
+        width: 50px;
+        height: 30px;
+        border: none;
+        cursor: pointer;
+      }
+      button {
+        padding: 10px 16px;
+        margin: 6px 4px;
+        cursor: pointer;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+      }
+      .btn-save {
+        background: #4caf50;
+        color: #fff;
+      }
+      .btn-reset {
+        background: #ff4d4f;
+        color: #fff;
+      }
+      .btn-return {
+        background: #2d14ba;
+        color: #fff;
+        text-decoration: none;
+        display: inline-block;
+        padding: 10px 16px;
+        border-radius: 6px;
+      }
+      .btn-return:hover {
+        background: #5330e6;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Painel de Controle</h1>
+    <h2>Quantidade de Setores</h2>
+    <label>
+      Número de setores:
+      <input
+        type="number"
+        id="numSetores"
+        min="2"
+        value="8"
+        style="width: 70px"
+      />
+    </label>
+    <button onclick="gerarSetores()">Gerar</button>
+
+    <script>
+      function gerarSetores() {
+        const qtd = parseInt(document.getElementById("numSetores").value) || 8;
+        const setores = [];
+        for (let i = 0; i < qtd; i++) {
+          setores.push({
+            text: "Setor " + (i + 1),
+            status: i % 2 === 0 ? "ganho" : "perda", // alterna só pra exemplo
+            prob: Math.floor(100 / qtd),
+            color: i % 2 === 0 ? "#88F23D" : "#2947F2",
+            limit: i % 2 === 0 ? 5 : 0,
+          });
+        }
+        saveConfigToLS(setores);
+        renderConfig();
+        renderStatus();
+        showToast("Foram criados " + qtd + " setores!");
+      }
+    </script>
+
+    <!-- Configuração -->
+    <h2>Configuração dos Setores</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Status</th>
+          <th>Prob (%)</th>
+          <th>Limite</th>
+          <th>Cor</th>
+        </tr>
+      </thead>
+      <tbody id="configTable"></tbody>
+    </table>
+
+    <h3>Regras de Derrotas</h3>
+    <label>
+      <input type="checkbox" id="chkForceWin" /> Forçar vitória após derrotas
+      seguidas
+    </label>
+    <br />
+    <label>
+      Número de derrotas seguidas:
+      <input
+        type="number"
+        id="numLosses"
+        min="1"
+        value="5"
+        style="width: 60px"
+      />
+    </label>
+
+    <div>
+      <button class="btn-save" onclick="saveConfig()">
+        Salvar Configuração
+      </button>
+      <button
+        class="btn"
+        style="background: #2196f3; color: #fff"
+        onclick="openSimulador()"
+      >
+        Simular Giros
+      </button>
+    </div>
+
+    <!-- Monitoramento -->
+    <h2>Status dos Prêmios</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Prêmio</th>
+          <th>Entregues</th>
+          <th>Limite Atual</th>
+        </tr>
+      </thead>
+      <tbody id="statusTable"></tbody>
+    </table>
+    <button class="btn-reset" onclick="resetCounts()">Zerar Entregues</button>
+    <button class="btn-save" onclick="baixarHistoricoCompleto()">
+      Baixar Histórico Completo
+    </button>
+
+    <!-- Navegação -->
+    <br />
+    <a href="index.html" target="_blank" class="btn-return"
+      >Voltar para a Roleta</a
+    >
+
+    <!-- Modal do Simulador -->
+    <div
+      class="modal-backdrop"
+      id="simuladorBackdrop"
+      style="
+        display: none;
+        align-items: center;
+        justify-content: center;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        z-index: 9999;
+      "
+    >
+      <div
+        class="modal"
+        style="
+          background: #fff;
+          border-radius: 8px;
+          padding: 20px;
+          max-width: 900px;
+          width: 95%;
+          color: #333;
+        "
+      >
+        <h2>Simulador de Giros</h2>
+        <p style="margin: 6px 0 14px; color: #555">
+          Os valores abaixo valem <strong>só para esta simulação</strong>. Nada
+          será salvo no painel.
+        </p>
+        <label>
+          Nº de setores para simulação:
+          <input
+            type="number"
+            id="simNumSetores"
+            min="2"
+            value="8"
+            style="width: 70px"
+          />
+        </label>
+        <button onclick="gerarSetoresSimulacao()">Gerar</button>
+        <div
+          style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px"
+        >
+          <label
+            >Giros:
+            <input
+              type="number"
+              id="simQtd"
+              value="100"
+              min="1"
+              style="width: 90px"
+          /></label>
+          <label style="display: flex; align-items: center; gap: 8px">
+            <input type="checkbox" id="simForce" /> Forçar vitória
+          </label>
+          <label
+            >Derrotas seguidas:
+            <input
+              type="number"
+              id="simLosses"
+              value="5"
+              min="1"
+              style="width: 70px"
+          /></label>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Status</th>
+              <th>
+                Prob (%)
+                <span style="font-weight: 400; color: #777">(simulação)</span>
+              </th>
+              <th>
+                Limite
+                <span style="font-weight: 400; color: #777">(simulação)</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="simTbody"></tbody>
+        </table>
+
+        <div style="margin-top: 10px">
+          <button class="btn-save" onclick="rodarSimulador()">
+            Rodar Simulação
+          </button>
+          <button class="btn-reset" onclick="closeSimulador()">Fechar</button>
+          <button
+            class="btn"
+            id="btnDownloadSim"
+            style="display: none; background: #555; color: #fff"
+          >
+            📥 Baixar rodadas
+          </button>
+        </div>
+
+        <pre
+          id="simOutput"
+          style="
+            margin-top: 15px;
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 6px;
+            max-height: 300px;
+            overflow: auto;
+          "
+        ></pre>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG_KEY = "wheelConfig";
+      const LIMITS_KEY = "wheelPrizeCounts";
+      const FORCE_KEY = "forceWinAfterLosses";
+
+      function getConfig() {
+        try {
+          return JSON.parse(localStorage.getItem(CONFIG_KEY)) || [];
+        } catch {
+          return [];
+        }
+      }
+      function saveConfigToLS(cfg) {
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+      }
+      function getCounts() {
+        try {
+          return JSON.parse(localStorage.getItem(LIMITS_KEY)) || {};
+        } catch {
+          return {};
+        }
+      }
+      function saveCounts(counts) {
+        localStorage.setItem(LIMITS_KEY, JSON.stringify(counts));
+      }
+      function getForceWinCfg() {
+        try {
+          return (
+            JSON.parse(localStorage.getItem(FORCE_KEY)) || {
+              enabled: false,
+              losses: 5,
+            }
+          );
+        } catch {
+          return { enabled: false, losses: 5 };
+        }
+      }
+
+      function normalizeProbabilities(cfg) {
+        const total = cfg.reduce((sum, s) => sum + (parseInt(s.prob) || 0), 0);
+        if (total === 0) {
+          const equal = Math.floor(100 / cfg.length);
+          cfg.forEach((s) => (s.prob = equal));
+        }
+        return cfg;
+      }
+
+      function showToast(msg) {
+        const div = document.createElement("div");
+        div.textContent = msg;
+        div.style.cssText =
+          "position:fixed;bottom:20px;right:20px;background:#4caf50;color:#fff;padding:10px 16px;border-radius:6px;z-index:9999;";
+        document.body.appendChild(div);
+        setTimeout(() => div.remove(), 2000);
+      }
+
+      function renderConfig() {
+        const cfg = getConfig();
+        const tbody = document.getElementById("configTable");
+        tbody.innerHTML = "";
+        cfg.forEach((sector, i) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+          <td><input type="text" value="${sector.text}" data-i="${i}" data-field="text"></td>
+          <td>
+            <select data-i="${i}" data-field="status">
+              <option value="ganho" ${sector.status === "ganho" ? "selected" : ""}>Ganho</option>
+              <option value="perda" ${sector.status === "perda" ? "selected" : ""}>Perda</option>
+            </select>
+          </td>
+          <td><input type="number" min="0" value="${sector.prob}" data-i="${i}" data-field="prob"></td>
+          <td><input type="number" min="0" value="${sector.limit || 0}" data-i="${i}" data-field="limit"></td>
+          <td><input type="color" value="${sector.color || "#888888"}" data-i="${i}" data-field="color"></td>
+        `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderStatus() {
+        const cfg = getConfig();
+        const counts = getCounts();
+        const tbody = document.getElementById("statusTable");
+        tbody.innerHTML = "";
+        cfg
+          .filter((s) => s.status === "ganho")
+          .forEach((sector) => {
+            const tr = document.createElement("tr");
+            const entregues = counts[sector.text] || 0;
+            tr.innerHTML = `
+          <td>${sector.text}</td>
+          <td>${entregues}</td>
+          <td>${sector.limit || 0}</td>
+        `;
+            tbody.appendChild(tr);
+          });
+      }
+
+      function saveConfig() {
+        const cfg = getConfig();
+        document
+          .querySelectorAll("#configTable input, #configTable select")
+          .forEach((el) => {
+            const i = +el.dataset.i;
+            const field = el.dataset.field;
+            if (field) {
+              cfg[i][field] =
+                field === "prob" || field === "limit"
+                  ? parseInt(el.value) || 0
+                  : el.value;
+            }
+          });
+        saveConfigToLS(normalizeProbabilities(cfg));
+        renderStatus();
+        showToast("Configuração salva!");
+      }
+
+      function resetCounts() {
+        saveCounts({});
+        renderStatus();
+        showToast("Prêmios zerados");
+      }
+
+      function saveForceWinConfig() {
+        const enabled = document.getElementById("chkForceWin").checked;
+        const losses =
+          parseInt(document.getElementById("numLosses").value) || 5;
+        const cfg = { enabled, losses };
+        localStorage.setItem(FORCE_KEY, JSON.stringify(cfg));
+        showToast("Regra de derrotas salva");
+      }
+      function loadForceWinConfig() {
+        try {
+          const cfg = JSON.parse(localStorage.getItem(FORCE_KEY)) || {};
+          document.getElementById("chkForceWin").checked = cfg.enabled || false;
+          document.getElementById("numLosses").value = cfg.losses || 5;
+        } catch {
+          document.getElementById("chkForceWin").checked = false;
+          document.getElementById("numLosses").value = 5;
+        }
+      }
+      document
+        .getElementById("chkForceWin")
+        .addEventListener("change", saveForceWinConfig);
+      document
+        .getElementById("numLosses")
+        .addEventListener("input", saveForceWinConfig);
+
+      if (getConfig().length === 0) {
+        saveConfigToLS([
+          {
+            text: "Uma Agenda",
+            status: "ganho",
+            prob: 5,
+            color: "#88F23D",
+            limit: 5,
+          },
+          { text: "Sem Sorte", status: "perda", prob: 15, color: "#2947F2" },
+          {
+            text: "Uma Squeeze",
+            status: "ganho",
+            prob: 5,
+            color: "#88F23D",
+            limit: 3,
+          },
+          {
+            text: "Não foi dessa vez",
+            status: "perda",
+            prob: 22,
+            color: "#2947F2",
+          },
+          {
+            text: "Uma Caneta",
+            status: "ganho",
+            prob: 10,
+            color: "#88F23D",
+            limit: 10,
+          },
+          { text: "Sem prêmio", status: "perda", prob: 22, color: "#2947F2" },
+          {
+            text: "Um Baralho",
+            status: "ganho",
+            prob: 2,
+            color: "#88F23D",
+            limit: 1,
+          },
+          { text: "Perdeu", status: "perda", prob: 22, color: "#2947F2" },
+        ]);
+      }
+
+      renderConfig();
+      renderStatus();
+      loadForceWinConfig();
+
+      /* ======================
+       Simulador
+    ====================== */
+      window.simularrodadas = function (options = {}) {
+        // usa cfg temporário (simulação) ou config real
+        const cfg = options.cfgOverride || getConfig();
+        const resultados = {
+          ganho: 0,
+          perda: 0,
+          detalhes: [],
+          vitoriasForcadas: 0,
+        };
+        const simCounts = {};
+        const simHistory = [];
+
+        const fwCfgControle = getForceWinCfg();
+        const fwCfg = {
+          enabled:
+            options.forceWin !== undefined
+              ? options.forceWin
+              : fwCfgControle.enabled,
+          losses: options.losses || fwCfgControle.losses || 5,
+        };
+
+        const qtd = options.qtd || 100;
+        const customLimits = options.limits || {};
+        const customProbs = options.probs || {};
+        const customNames = options.names || {};
+        const customStatus = options.statuses || {};
+
+        // calcula probabilidade final
+        function probFor(s) {
+          const v = customProbs.hasOwnProperty(s.text)
+            ? +customProbs[s.text]
+            : +s.prob || 0;
+          return isNaN(v) ? 0 : v;
+        }
+
+        // respeita limites (do override OU da grid customizada)
+        function simCanWin(prize) {
+          const sector = cfg.find((s) => s.text === prize);
+          if (
+            !sector ||
+            (customStatus[sector.text] || sector.status) !== "ganho"
+          )
+            return false;
+
+          // prioridade: customLimits > sector.limit
+          const limiteControle = sector.limit || 0;
+          const limite = customLimits.hasOwnProperty(prize)
+            ? customLimits[prize]
+            : limiteControle;
+
+          if (!limite) return true; // limite 0 = ilimitado
+          const current = simCounts[prize] || 0;
+          return current < limite;
+        }
+
+        function simRegister(prize) {
+          simCounts[prize] = (simCounts[prize] || 0) + 1;
+        }
+
+        for (let k = 0; k < qtd; k++) {
+          const needed = Math.max(1, fwCfg.losses || 5);
+          const forceWin =
+            fwCfg.enabled &&
+            simHistory.length >= needed &&
+            simHistory.slice(-needed).every((s) => s === "perda");
+
+          // monta pool com base no cfg ativo
+          const pool = cfg
+            .map((s, i) => {
+              const name = customNames[s.text] || s.text;
+              const status = customStatus[s.text] || s.status;
+              return {
+                i,
+                prob: probFor(s),
+                setor: { ...s, text: name, status },
+              };
+            })
+            .filter((x) => {
+              if (x.setor.status === "ganho") return simCanWin(x.setor.text);
+              return true;
+            })
+            .filter((x) => !forceWin || x.setor.status === "ganho");
+
+          let idx;
+          if (!pool.length) {
+            idx = cfg.findIndex(
+              (s) => (customStatus[s.text] || s.status) === "perda",
+            );
+          } else {
+            const total = pool.reduce((a, x) => a + x.prob, 0);
+            let r = Math.random() * (total || pool.length),
+              acc = 0;
+            for (const x of pool) {
+              const w = x.prob || 1;
+              acc += w;
+              if (r <= acc) {
+                idx = x.i;
+                break;
+              }
+            }
+          }
+
+          const s = pool.find((p) => p.i === idx)?.setor || cfg[idx];
+          let statusFinal = s.status;
+
+          if (s.status === "ganho" && simCanWin(s.text)) {
+            simRegister(s.text);
+          } else if (s.status === "ganho") {
+            statusFinal = "perda";
+          }
+
+          simHistory.push(statusFinal);
+          if (simHistory.length > (fwCfg.losses || 5)) simHistory.shift();
+
+          resultados[statusFinal] += 1;
+          if (forceWin && statusFinal === "ganho") {
+            resultados.vitoriasForcadas++;
+          }
+          resultados.detalhes.push({
+            rodada: k + 1,
+            item: s.text,
+            status: statusFinal,
+            forcedByHistory: forceWin,
+          });
+        }
+        return {
+          ...resultados,
+          contadoresSimulados: simCounts,
+          regraDerrotaUsada: fwCfg,
+        };
+      };
+
+      /* ===== Modal do Simulador ===== */
+      function renderSimuladorGrid() {
+        const cfg = getConfig();
+        const tbody = document.getElementById("simTbody");
+        tbody.innerHTML = "";
+        cfg.forEach((s, i) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+          <td><input type="text" value="${s.text}" data-name="${s.text}" data-field="name" style="width:160px"></td>
+          <td>
+            <select data-name="${s.text}" data-field="status">
+              <option value="ganho" ${s.status === "ganho" ? "selected" : ""}>Ganho</option>
+              <option value="perda" ${s.status === "perda" ? "selected" : ""}>Perda</option>
+            </select>
+          </td>
+          <td><input type="number" min="0" value="${s.prob || 0}" data-name="${s.text}" data-field="prob" style="width:90px"></td>
+          <td><input type="number" min="0" value="${s.limit || 0}" data-name="${s.text}" data-field="limit" style="width:90px"></td>
+        `;
+          tbody.appendChild(tr);
+        });
+      }
+      function gerarSetoresSimulacao() {
+        const qtd =
+          parseInt(document.getElementById("simNumSetores").value) || 8;
+        const setores = [];
+        for (let i = 0; i < qtd; i++) {
+          setores.push({
+            text: "Sim " + (i + 1),
+            status: i % 2 === 0 ? "ganho" : "perda",
+            prob: Math.floor(100 / qtd),
+            limit: i % 2 === 0 ? 3 : 0,
+            color: i % 2 === 0 ? "#88F23D" : "#2947F2",
+          });
+        }
+
+        // Renderiza na grid do simulador
+        const tbody = document.getElementById("simTbody");
+        tbody.innerHTML = "";
+        setores.forEach((s, i) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+      <td><input type="text" value="${s.text}" data-name="${s.text}" data-field="name" style="width:160px"></td>
+      <td>
+        <select data-name="${s.text}" data-field="status">
+          <option value="ganho" ${s.status === "ganho" ? "selected" : ""}>Ganho</option>
+          <option value="perda" ${s.status === "perda" ? "selected" : ""}>Perda</option>
+        </select>
+      </td>
+      <td><input type="number" min="0" value="${s.prob}" data-name="${s.text}" data-field="prob" style="width:90px"></td>
+      <td><input type="number" min="0" value="${s.limit}" data-name="${s.text}" data-field="limit" style="width:90px"></td>
+    `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function openSimulador() {
+        renderSimuladorGrid();
+        const f = getForceWinCfg();
+        document.getElementById("simForce").checked = !!f.enabled;
+        document.getElementById("simLosses").value = f.losses || 5;
+        document.getElementById("simuladorBackdrop").style.display = "flex";
+      }
+      function closeSimulador() {
+        document.getElementById("simuladorBackdrop").style.display = "none";
+        document.getElementById("simOutput").textContent = "";
+        document.getElementById("btnDownloadSim").style.display = "none";
+      }
+
+      function rodarSimulador() {
+        const qtd = parseInt(document.getElementById("simQtd").value) || 100;
+        const forceWin = document.getElementById("simForce").checked;
+        const losses =
+          parseInt(document.getElementById("simLosses").value) || 5;
+
+        const probs = {},
+          limits = {},
+          names = {},
+          statuses = {};
+        document
+          .querySelectorAll('#simTbody input[data-field="prob"]')
+          .forEach((el) => {
+            probs[el.dataset.name] = parseInt(el.value) || 0;
+          });
+        document
+          .querySelectorAll('#simTbody input[data-field="limit"]')
+          .forEach((el) => {
+            limits[el.dataset.name] = parseInt(el.value) || 0;
+          });
+        document
+          .querySelectorAll('#simTbody input[data-field="name"]')
+          .forEach((el) => {
+            names[el.dataset.name] = el.value;
+          });
+        document
+          .querySelectorAll('#simTbody select[data-field="status"]')
+          .forEach((el) => {
+            statuses[el.dataset.name] = el.value;
+          });
+
+        const result = simularrodadas({
+          qtd,
+          forceWin,
+          losses,
+          limits,
+          probs,
+          names,
+          statuses,
+        });
+
+        let txt = `Resultado da Simulação\n`;
+        txt += `Giros: ${qtd}\n`;
+        txt += `Ganhos: ${result.ganho}\n`;
+        txt += `Perdas: ${result.perda}\n\n`;
+        txt += `Vitórias forçadas: ${result.vitoriasForcadas}\n`;
+        txt += `Contadores:\n`;
+        for (const [prize, count] of Object.entries(
+          result.contadoresSimulados,
+        )) {
+          txt += ` - ${prize}: ${count}\n`;
+        }
+        txt += `\nRegra de derrotas usada: ${JSON.stringify(result.regraDerrotaUsada)}\n`;
+
+        document.getElementById("simOutput").textContent = txt;
+
+        // Exportação detalhada
+        let log = `Rodadas detalhadas (${qtd} giros)\n\n`;
+        result.detalhes.forEach((r) => {
+          log += `#${r.rodada} | Item: ${r.item} | Status: ${r.status}`;
+          if (r.forcedByHistory) log += " | [Forçado por derrotas]";
+          log += "\n";
+        });
+
+        const blob = new Blob([log], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const btn = document.getElementById("btnDownloadSim");
+        btn.style.display = "inline-block";
+        btn.onclick = () => {
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `simulacao_${qtd}_giros.txt`;
+          a.click();
+          URL.revokeObjectURL(url);
+        };
+      }
+
+      // === BOTÃO PARA BAIXAR HISTÓRICO COMPLETO ===
+      function baixarHistoricoCompleto() {
+        const counts = getCounts();
+        const cfg = getConfig();
+        const history = JSON.parse(
+          localStorage.getItem("wheelFullHistory") || "[]",
+        );
+
+        let relatorio = "=== HISTÓRICO DE RODADAS ===\n\n";
+        history.forEach((h, i) => {
+          relatorio += `${i + 1}. ${h.item} - ${h.status}`;
+          if (h.forcedByHistory) relatorio += " [Vitória Forçada]";
+          relatorio += ` (${new Date(h.timestamp).toLocaleString("pt-BR")})\n`;
+        });
+
+        relatorio += "\n\n=== PRÊMIOS ENTREGUES ===\n\n";
+        cfg
+          .filter((s) => s.status === "ganho")
+          .forEach((sector) => {
+            const entregues = counts[sector.text] || 0;
+            relatorio += `${sector.text}: ${entregues} entregues (Limite atual: ${sector.limit || 0})\n`;
+          });
+
+        relatorio += `\nData de geração: ${new Date().toLocaleString("pt-BR")}`;
+
+        const blob = new Blob([relatorio], {
+          type: "text/plain;charset=utf-8",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "historico-completo.txt";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    </script>
+  </body>
+</html>
